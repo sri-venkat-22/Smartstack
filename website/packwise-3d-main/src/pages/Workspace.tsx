@@ -9,28 +9,27 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
   Loader2, Plus, Trash2, Play, Pause, Package, Upload, FileUp,
-  SkipBack, SkipForward, ChevronLeft, ChevronRight, Scale, ShieldAlert, ShieldCheck
+  SkipBack, SkipForward, ChevronLeft, ChevronRight, Scale, ShieldAlert, ShieldCheck, Fingerprint
 } from 'lucide-react';
 import { toast } from 'sonner';
 import Papa from 'papaparse';
-import { cn } from '@/lib/utils'; // Assuming you have a utility for class names, otherwise use template literals
 
 // --- TYPES ---
 interface PackedItem {
-  name: string;
+  id: string;
   position: [number, number, number];
   dimensions: [number, number, number];
-  weight?: number;   // New field coming back from API (optional)
-  fragile?: boolean; // New field coming back from API (optional)
+  weight?: number;
+  fragile?: boolean;
 }
 
 interface ItemInput {
-  id: string;
+  id: string; // Acts as both unique Key and Display Label
   width: number;
   height: number;
   depth: number;
-  weight: number;    // NEW
-  fragile: boolean;  // NEW
+  weight: number;
+  fragile: boolean;
 }
 
 const COLORS = [
@@ -38,8 +37,8 @@ const COLORS = [
   '#06b6d4', '#a855f7', '#22c55e', '#eab308', '#f43f5e'
 ];
 
-/* -------------------- 3D BOX COMPONENT -------------------- */
-function PackedBox({ position, dimensions, name, color, hovered, onHover, onClick, weight, fragile }: any) {
+/* -------------------- 3D BOX COMPONENT (With Large Tooltip) -------------------- */
+function PackedBox({ position, dimensions, id, color, hovered, onHover, onClick, weight, fragile }: any) {
   const mesh = useRef<THREE.Mesh>(null);
   const [w, h, d] = dimensions;
   const [x, y, z] = position;
@@ -59,7 +58,6 @@ function PackedBox({ position, dimensions, name, color, hovered, onHover, onClic
         onClick={(e) => { e.stopPropagation(); onClick(); }}
       >
         <boxGeometry args={[w, h, d]} />
-        {/* Fragile items get a slight red tint if desired, otherwise standard color */}
         <meshStandardMaterial
             color={fragile ? '#ff6b6b' : color}
             transparent
@@ -74,26 +72,31 @@ function PackedBox({ position, dimensions, name, color, hovered, onHover, onClic
         <lineBasicMaterial color={hovered ? '#ffffff' : 'rgba(0,0,0,0.3)'} />
       </lineSegments>
 
-      {/* TOOLTIP */}
+      {/* --- LARGE ID TOOLTIP --- */}
       {hovered && (
-        <Html distanceFactor={10} zIndexRange={[100, 0]}>
-          <div className="glass-panel px-3 py-2 text-xs pointer-events-none whitespace-nowrap z-50 shadow-xl border border-white/20 bg-black/80 text-white rounded-md">
-            <div className="flex items-center gap-2 mb-1 border-b border-white/10 pb-1">
-                <b className="text-primary">{name}</b>
-                {fragile && <ShieldAlert className="w-3 h-3 text-red-500 animate-pulse" />}
+        <Html distanceFactor={8} zIndexRange={[100, 0]}>
+          <div className="glass-panel p-3 min-w-[160px] pointer-events-none select-none z-50 shadow-2xl border border-white/30 bg-black/90 text-white rounded-lg transform -translate-y-8">
+
+            {/* Header: Big ID */}
+            <div className="flex items-center gap-2 mb-2 border-b border-white/20 pb-2">
+                <Fingerprint className="w-5 h-5 text-primary" />
+                <span className="font-mono font-bold text-primary text-xl tracking-tight truncate max-w-[150px]">{id}</span>
+                {fragile && <ShieldAlert className="w-5 h-5 text-red-500 animate-pulse ml-auto flex-shrink-0" />}
             </div>
-            <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-[10px] opacity-90">
-                <span>Dim:</span> <span>{w} × {h} × {d}</span>
-                <span>Pos:</span> <span>[{x}, {y}, {z}]</span>
+
+            {/* Details */}
+            <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs opacity-90 font-mono">
+                <span className="text-muted-foreground">Dim:</span> <span>{w} × {h} × {d}</span>
+                <span className="text-muted-foreground">Pos:</span> <span>[{x}, {y}, {z}]</span>
                 {weight > 0 && (
                     <>
-                        <span>Wt:</span>
-                        <span className="font-mono text-yellow-400">{weight}kg</span>
+                        <span className="text-muted-foreground">Wt:</span>
+                        <span className="text-yellow-400 font-bold">{weight}kg</span>
                     </>
                 )}
                 {fragile && (
-                    <span className="col-span-2 text-red-400 font-bold text-center mt-1 uppercase tracking-wider">
-                        FRAGILE
+                    <span className="col-span-2 text-red-400 font-bold text-center mt-2 border-t border-white/10 pt-1 tracking-widest uppercase text-[10px]">
+                        FRAGILE CONTENT
                     </span>
                 )}
             </div>
@@ -132,10 +135,10 @@ export default function Workspace() {
   const [binHeight, setBinHeight] = useState(10);
   const [binDepth, setBinDepth] = useState(10);
 
-  // Initial state with weight and fragile props
+  // Initial State
   const [items, setItems] = useState<ItemInput[]>([
-    { id: '1', width: 3, height: 4, depth: 2, weight: 1.5, fragile: false },
-    { id: '2', width: 2, height: 2, depth: 2, weight: 0.5, fragile: true },
+    { id: 'BOX-001', width: 3, height: 4, depth: 2, weight: 1.5, fragile: false },
+    { id: 'BOX-002', width: 2, height: 2, depth: 2, weight: 0.5, fragile: true },
   ]);
 
   const [packedItems, setPackedItems] = useState<PackedItem[]>([]);
@@ -146,10 +149,9 @@ export default function Workspace() {
   // Replay State
   const [currentStep, setCurrentStep] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
-
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // --- AUTO-PLAY EFFECT ---
+  // Auto-Play Logic
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (isPlaying) {
@@ -164,13 +166,12 @@ export default function Workspace() {
   }, [isPlaying, packedItems.length]);
 
   const addItem = () =>
-    setItems([...items, { id: Date.now().toString(), width: 2, height: 2, depth: 2, weight: 0, fragile: false }]);
+    setItems([...items, { id: `Item-${Date.now().toString().slice(-4)}`, width: 2, height: 2, depth: 2, weight: 0, fragile: false }]);
 
-  // Generic updater for numbers/booleans
   const updateItem = (id: string, key: keyof ItemInput, val: any) =>
     setItems(items.map(i => i.id === id ? { ...i, [key]: val } : i));
 
-  // --- CSV PARSER (UPDATED) ---
+  // --- SMART CSV PARSER ---
   const handleCSV = (file: File) => {
     Papa.parse(file, {
       header: true,
@@ -186,7 +187,6 @@ export default function Workspace() {
           let d = row.depth || row.d || row.deep || 0;
           const weight = row.weight || row.wt || row.mass || row.kg || 0;
 
-          // Flexible Fragility Parsing
           let fragile = row.fragile || row.fragility || false;
           if (typeof fragile === 'string') {
               const lower = fragile.toLowerCase();
@@ -198,9 +198,12 @@ export default function Workspace() {
           if (!d && (row.length || row.l || row.len)) d = row.length || row.l || row.len;
           if (!w && d && (row.length || row.l)) w = row.length || row.l;
 
+          // Detect ID or generate one
+          const customId = row.id || row.sku || row.label || row.name || `CSV-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
+
           if (Number(w) > 0 && Number(h) > 0 && Number(d) > 0) {
             newItems.push({
-              id: Math.random().toString(36).substr(2, 9),
+              id: String(customId),
               width: Number(w),
               height: Number(h),
               depth: Number(d),
@@ -230,11 +233,12 @@ export default function Workspace() {
     else toast.error("Please drop a valid CSV file");
   }, []);
 
+  // --- CONNECT TO BACKEND ---
   const generatePacking = async () => {
     setLoading(true);
     setIsPlaying(false);
     try {
-      // Sending [w, h, d, weight, is_fragile(1/0)]
+      // Sends [w, h, d, weight, fragile, id] to Python
       const res = await fetch('http://localhost:8000/pack', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -245,7 +249,8 @@ export default function Workspace() {
               i.height,
               i.depth,
               i.weight,
-              i.fragile ? 1 : 0
+              i.fragile ? 1 : 0,
+              i.id
           ])
         })
       });
@@ -253,25 +258,14 @@ export default function Workspace() {
       if (!res.ok) throw new Error("Server Error");
 
       const data = await res.json();
-      // Ensure backend returns data mapped correctly or map it here if needed
-      // Assuming backend returns a list of objects that might match PackedItem interface
-      // We merge original metadata (weight/fragile) back if the backend doesn't return it
-      const enhancedItems = data.packed_items.map((pItem: any, idx: number) => ({
-          ...pItem,
-          // Fallback: If backend doesn't return weight/fragile, we might lose track of which item is which
-          // Ideally backend returns ID. For now, we trust the visual.
-          weight: pItem.weight ?? 0,
-          fragile: pItem.fragile ?? false
-      }));
-
-      setPackedItems(enhancedItems);
-      setCurrentStep(enhancedItems.length);
+      setPackedItems(data.packed_items);
+      setCurrentStep(data.packed_items.length);
       toast.success("Packing generated!");
     } catch (e) {
       console.error(e);
       setPackedItems([]);
       setCurrentStep(0);
-      toast.error("Failed to connect to packing server");
+      toast.error("Failed to connect. Is server.py running?");
     }
     setLoading(false);
   };
@@ -318,12 +312,8 @@ export default function Workspace() {
                 <h2 className="font-semibold text-sm">Items ({items.length})</h2>
                 <div className="flex gap-1">
                   <input type="file" ref={fileInputRef} onChange={(e) => e.target.files?.[0] && handleCSV(e.target.files[0])} accept=".csv" className="hidden" />
-                  <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => fileInputRef.current?.click()}>
-                    <Upload className="w-4 h-4" />
-                  </Button>
-                  <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={addItem}>
-                    <Plus className="w-4 h-4" />
-                  </Button>
+                  <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => fileInputRef.current?.click()}><Upload className="w-4 h-4" /></Button>
+                  <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={addItem}><Plus className="w-4 h-4" /></Button>
                 </div>
               </div>
 
@@ -346,7 +336,6 @@ export default function Workspace() {
                         initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, height: 0 }}
                         className="flex flex-col gap-2 p-2 rounded border border-border/50 bg-background/50 hover:bg-muted/50 transition-colors group relative"
                       >
-                        {/* Remove Button (Absolute top-right) */}
                         <Button
                             size="icon" variant="ghost"
                             className="absolute -right-2 -top-2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity z-10 text-muted-foreground hover:text-destructive"
@@ -355,9 +344,12 @@ export default function Workspace() {
                             <Trash2 className="w-3 h-3" />
                         </Button>
 
-                        {/* Top Row: Color + Dimensions */}
+                        {/* Top: ID + Dims */}
                         <div className="flex items-center gap-2">
                             <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: COLORS[i % COLORS.length] }} />
+                            <div className="text-[10px] font-mono text-muted-foreground w-16 truncate font-bold text-primary/80" title={item.id}>
+                                {item.id}
+                            </div>
                             <div className="grid grid-cols-3 gap-1 flex-1">
                             {(['width','height','depth'] as const).map(k => (
                                 <Input
@@ -369,7 +361,7 @@ export default function Workspace() {
                             </div>
                         </div>
 
-                        {/* Bottom Row: Weight + Fragility */}
+                        {/* Bottom: Wt + Fragile */}
                         <div className="flex items-center gap-2 pl-4">
                             <div className="relative flex-1">
                                 <Scale className="absolute left-1.5 top-2 w-3 h-3 text-muted-foreground" />
@@ -423,8 +415,8 @@ export default function Workspace() {
                   key={i}
                   {...item}
                   color={COLORS[i % COLORS.length]}
-                  hovered={hovered === item.name}
-                  onHover={(v: boolean) => setHovered(v ? item.name : null)}
+                  hovered={hovered === item.id}
+                  onHover={(v: boolean) => setHovered(v ? item.id : null)}
                 />
               ))}
             </group>

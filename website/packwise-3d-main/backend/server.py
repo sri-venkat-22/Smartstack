@@ -2,24 +2,23 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List, Tuple
+from typing import List, Any  # Changed to Any to allow strings
 
 app = FastAPI()
 
-# 1. Allow the React app to talk to this server
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allows all origins (good for development)
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 
-# 2. Define the data format we expect from React
+# CHANGED: items is now List[List[Any]] to accept [w, h, d, weight, fragile, id_string]
 class PackRequest(BaseModel):
-    bin: List[float]  # [width, height, depth]
-    items: List[List[float]]  # [[w, h, d, weight, fragile], ...]
+    bin: List[float]
+    items: List[List[Any]]
 
 
 class Box:
@@ -29,8 +28,8 @@ class Box:
         self.d = d
         self.weight = weight
         self.fragile = fragile
-        self.id = id
-        self.position = None  # [x, y, z]
+        self.id = id  # Store the unique ID string
+        self.position = None
 
 
 def intersect(b1, pos1, b2, pos2):
@@ -45,86 +44,60 @@ def intersect(b1, pos1, b2, pos2):
 def pack_items(req: PackRequest):
     bin_w, bin_h, bin_d = req.bin
 
-    # Create Box objects
     boxes = []
     for i, item in enumerate(req.items):
-        # item = [w, h, d, weight, fragile]
-        boxes.append(Box(item[0], item[1], item[2], item[3], bool(item[4]), i))
+        # Expecting: [w, h, d, weight, fragile, id]
+        # Fallback to "Item N" if no ID is provided
+        custom_id = item[5] if len(item) > 5 else f"Item {i + 1}"
+        boxes.append(Box(item[0], item[1], item[2], item[3], bool(item[4]), custom_id))
 
-    # --- THE LOGIC ---
-    # Sort items so we pack the "Foundation" first:
-    # 1. Non-Fragile first (0), Fragile last (1)
-    # 2. Heaviest first (descending weight)
-    # 3. Largest Volume first (tie-breaker)
+    # Sort: Fragile last, Heaviest first, Largest first
     boxes.sort(key=lambda x: (x.fragile, -x.weight, -(x.w * x.h * x.d)))
 
     packed_boxes = []
 
     for box in boxes:
         best_pos = None
-        min_dist_to_origin = float('inf')
-
-        # Try to place the box at every corner of every existing box (plus origin)
-        # This is a simplified "Corner Point" heuristic
+        # Start at origin + corners of existing boxes
         candidate_points = [(0, 0, 0)]
         for pb in packed_boxes:
             px, py, pz = pb.position
             pw, ph, pd = pb.w, pb.h, pb.d
-            # Add points at the top-right-front corners of existing boxes
-            candidate_points.append((px + pw, py, pz))  # Right
-            candidate_points.append((px, py + ph, pz))  # Top
-            candidate_points.append((px, py, pz + pd))  # Front
-            # Also try stacking directly on top (important for gravity logic)
+            candidate_points.append((px + pw, py, pz))
             candidate_points.append((px, py + ph, pz))
+            candidate_points.append((px, py, pz + pd))
+            candidate_points.append((px, py + ph, pz))  # Stack logic
 
-            # Sort points to prefer (0,0,0) / bottom-left-back
         candidate_points.sort(key=lambda p: (p[1], p[2], p[0]))
 
         placed = False
-
-        # Try both orientations (Standard and Rotated 90 degrees on floor)
-        orientations = [
-            (box.w, box.h, box.d),
-            (box.d, box.h, box.w)  # Rotate on floor
-        ]
+        orientations = [(box.w, box.h, box.d), (box.d, box.h, box.w)]
 
         for w, h, d in orientations:
             if placed: break
-
             for x, y, z in candidate_points:
-                # 1. Check if fits in Bin
-                if x + w > bin_w or y + h > bin_h or z + d > bin_d:
-                    continue
+                if x + w > bin_w or y + h > bin_h or z + d > bin_d: continue
 
-                # 2. Check collision with packed boxes
                 collision = False
                 for pb in packed_boxes:
-                    if intersect(
-                            type('obj', (object,), {'w': w, 'h': h, 'd': d}), (x, y, z),
-                            pb, pb.position
-                    ):
+                    if intersect(type('obj', (object,), {'w': w, 'h': h, 'd': d}), (x, y, z), pb, pb.position):
                         collision = True
                         break
 
                 if not collision:
-                    box.w, box.h, box.d = w, h, d  # Update orientation
+                    box.w, box.h, box.d = w, h, d
                     box.position = [x, y, z]
                     packed_boxes.append(box)
                     placed = True
                     break
 
-    # Format response for React
-    result = []
-    for box in packed_boxes:
-        result.append({
-            "name": f"Item {box.id + 1}",
-            "dimensions": [box.w, box.h, box.d],
-            "position": box.position,
-            "weight": box.weight,
-            "fragile": box.fragile
-        })
-
-    return {"packed_items": result}
+    return {"packed_items": [{
+        "id": box.id,  # Return the ID
+        "dimensions": [box.w, box.h, box.d],
+        "position": box.position,
+        "weight": box.weight,
+        "fragile": box.fragile
+    } for box in packed_boxes]}
 
 
 if __name__ == "__main__":
