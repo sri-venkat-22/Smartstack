@@ -1,593 +1,5 @@
-// import { useState, useRef, useMemo, useCallback } from 'react';
-// import { Canvas, useFrame, useThree, ThreeEvent } from '@react-three/fiber';
-// import { OrbitControls, Html, Line, PerspectiveCamera } from '@react-three/drei';
-// import * as THREE from 'three';
-// import { motion, AnimatePresence } from 'framer-motion';
-// import { Navbar } from '@/components/Navbar';
-// import { Button } from '@/components/ui/button';
-// import { Input } from '@/components/ui/input';
-// import { Label } from '@/components/ui/label';
-// import { Loader2, Plus, Trash2, Play, RotateCcw, Package, AlertCircle } from 'lucide-react';
-// import { useMouse } from '@/hooks/useMouse';
-
-// interface PackedItem {
-//   name: string;
-//   position: [number, number, number];
-//   dimensions: [number, number, number];
-// }
-
-// interface ItemInput {
-//   id: string;
-//   width: number;
-//   height: number;
-//   depth: number;
-// }
-
-// interface BoxProps {
-//   position: [number, number, number];
-//   dimensions: [number, number, number];
-//   name: string;
-//   color: string;
-//   isHovered: boolean;
-//   onClick: () => void;
-//   onHover: (hovered: boolean) => void;
-// }
-
-// const COLORS = [
-//   '#00d4ff', '#8b5cf6', '#10b981', '#f59e0b', '#ec4899',
-//   '#06b6d4', '#a855f7', '#22c55e', '#eab308', '#f43f5e'
-// ];
-
-// function PackedBox({ position, dimensions, name, color, isHovered, onClick, onHover }: BoxProps) {
-//   const meshRef = useRef<THREE.Mesh>(null);
-//   const [w, h, d] = dimensions;
-//   const [x, y, z] = position;
-  
-//   // Center the box at its position (position is corner, we need center)
-//   const centerPosition: [number, number, number] = [x + w/2, y + h/2, z + d/2];
-
-//   useFrame(() => {
-//     if (meshRef.current) {
-//       meshRef.current.scale.setScalar(isHovered ? 1.02 : 1);
-//     }
-//   });
-
-//   return (
-//     <group position={centerPosition}>
-//       <mesh
-//         ref={meshRef}
-//         onClick={onClick}
-//         onPointerOver={() => onHover(true)}
-//         onPointerOut={() => onHover(false)}
-//       >
-//         <boxGeometry args={[w, h, d]} />
-//         <meshStandardMaterial 
-//           color={color} 
-//           transparent 
-//           opacity={isHovered ? 0.9 : 0.75}
-//           roughness={0.3}
-//           metalness={0.7}
-//         />
-//       </mesh>
-//       <lineSegments>
-//         <edgesGeometry args={[new THREE.BoxGeometry(w, h, d)]} />
-//         <lineBasicMaterial color={isHovered ? '#ffffff' : color} linewidth={2} />
-//       </lineSegments>
-      
-//       {isHovered && (
-//         <Html position={[0, h/2 + 0.5, 0]} center distanceFactor={10}>
-//           <div className="glass-panel px-3 py-2 text-xs whitespace-nowrap pointer-events-none">
-//             <p className="font-semibold text-foreground">{name}</p>
-//             <p className="text-muted-foreground">
-//               {w.toFixed(1)} × {h.toFixed(1)} × {d.toFixed(1)}
-//             </p>
-//             <p className="text-muted-foreground">
-//               Pos: ({x.toFixed(1)}, {y.toFixed(1)}, {z.toFixed(1)})
-//             </p>
-//           </div>
-//         </Html>
-//       )}
-//     </group>
-//   );
-// }
-
-// function BinWireframe({ dimensions }: { dimensions: [number, number, number] }) {
-//   const [w, h, d] = dimensions;
-//   const halfW = w / 2;
-//   const halfH = h / 2;
-//   const halfD = d / 2;
-
-//   const points: [number, number, number][] = [
-//     // Bottom face
-//     [0, 0, 0], [w, 0, 0],
-//     [w, 0, 0], [w, 0, d],
-//     [w, 0, d], [0, 0, d],
-//     [0, 0, d], [0, 0, 0],
-//     // Top face
-//     [0, h, 0], [w, h, 0],
-//     [w, h, 0], [w, h, d],
-//     [w, h, d], [0, h, d],
-//     [0, h, d], [0, h, 0],
-//     // Vertical edges
-//     [0, 0, 0], [0, h, 0],
-//     [w, 0, 0], [w, h, 0],
-//     [w, 0, d], [w, h, d],
-//     [0, 0, d], [0, h, d],
-//   ];
-
-//   return (
-//     <group position={[0, 0, 0]}>
-//       {/* Semi-transparent faces */}
-//       <mesh position={[halfW, halfH, halfD]}>
-//         <boxGeometry args={[w, h, d]} />
-//         <meshStandardMaterial 
-//           color="#00d4ff" 
-//           transparent 
-//           opacity={0.05}
-//           side={THREE.DoubleSide}
-//         />
-//       </mesh>
-      
-//       {/* Wireframe edges */}
-//       {Array.from({ length: 12 }).map((_, i) => (
-//         <Line
-//           key={i}
-//           points={[points[i * 2], points[i * 2 + 1]]}
-//           color="#00d4ff"
-//           lineWidth={1.5}
-//           transparent
-//           opacity={0.6}
-//         />
-//       ))}
-      
-//       {/* Grid on bottom */}
-//       <gridHelper 
-//         args={[Math.max(w, d), 10, '#1a3a5c', '#0f2744']} 
-//         position={[halfW, 0.001, halfD]} 
-//         rotation={[0, 0, 0]}
-//       />
-//     </group>
-//   );
-// }
-
-// function CameraController({ binDimensions, focusedItem }: { 
-//   binDimensions: [number, number, number];
-//   focusedItem: PackedItem | null;
-// }) {
-//   const { camera } = useThree();
-//   const mouse = useMouse();
-//   const [w, h, d] = binDimensions;
-//   const maxDim = Math.max(w, h, d);
-  
-//   useFrame(() => {
-//     if (focusedItem) {
-//       const [x, y, z] = focusedItem.position;
-//       const [fw, fh, fd] = focusedItem.dimensions;
-//       const targetX = x + fw/2;
-//       const targetY = y + fh/2;
-//       const targetZ = z + fd/2;
-      
-//       camera.position.x += (targetX + maxDim * 0.8 - camera.position.x) * 0.05;
-//       camera.position.y += (targetY + maxDim * 0.5 - camera.position.y) * 0.05;
-//       camera.position.z += (targetZ + maxDim * 0.8 - camera.position.z) * 0.05;
-//     } else {
-//       // Subtle camera movement based on mouse
-//       const targetX = w/2 + mouse.normalizedX * maxDim * 0.2;
-//       const targetY = h/2 + maxDim * 0.8 + mouse.normalizedY * maxDim * 0.1;
-//       const targetZ = d/2 + maxDim * 1.5;
-      
-//       camera.position.x += (targetX - camera.position.x) * 0.02;
-//       camera.position.y += (targetY - camera.position.y) * 0.02;
-//       camera.position.z += (targetZ - camera.position.z) * 0.02;
-//     }
-    
-//     camera.lookAt(w/2, h/2, d/2);
-//   });
-
-//   return null;
-// }
-
-// function Scene({ 
-//   binDimensions, 
-//   packedItems, 
-//   hoveredItem,
-//   focusedItem,
-//   setHoveredItem,
-//   setFocusedItem 
-// }: {
-//   binDimensions: [number, number, number];
-//   packedItems: PackedItem[];
-//   hoveredItem: string | null;
-//   focusedItem: PackedItem | null;
-//   setHoveredItem: (name: string | null) => void;
-//   setFocusedItem: (item: PackedItem | null) => void;
-// }) {
-//   return (
-//     <>
-//       <CameraController binDimensions={binDimensions} focusedItem={focusedItem} />
-//       <OrbitControls 
-//         enableDamping 
-//         dampingFactor={0.05}
-//         minDistance={3}
-//         maxDistance={50}
-//       />
-      
-//       <ambientLight intensity={0.4} />
-//       <directionalLight position={[10, 20, 10]} intensity={0.8} castShadow />
-//       <pointLight position={[-10, 10, -10]} intensity={0.3} color="#00d4ff" />
-      
-//       <BinWireframe dimensions={binDimensions} />
-      
-//       {packedItems.map((item, index) => (
-//         <PackedBox
-//           key={item.name}
-//           position={item.position}
-//           dimensions={item.dimensions}
-//           name={item.name}
-//           color={COLORS[index % COLORS.length]}
-//           isHovered={hoveredItem === item.name}
-//           onClick={() => setFocusedItem(focusedItem?.name === item.name ? null : item)}
-//           onHover={(hovered) => setHoveredItem(hovered ? item.name : null)}
-//         />
-//       ))}
-//     </>
-//   );
-// }
-
-// export default function Workspace() {
-//   const [binWidth, setBinWidth] = useState(10);
-//   const [binHeight, setBinHeight] = useState(10);
-//   const [binDepth, setBinDepth] = useState(10);
-//   const [items, setItems] = useState<ItemInput[]>([
-//     { id: '1', width: 3, height: 4, depth: 2 },
-//     { id: '2', width: 2, height: 2, depth: 2 },
-//     { id: '3', width: 4, height: 3, depth: 3 },
-//   ]);
-//   const [packedItems, setPackedItems] = useState<PackedItem[]>([]);
-//   const [isLoading, setIsLoading] = useState(false);
-//   const [error, setError] = useState<string | null>(null);
-//   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
-//   const [focusedItem, setFocusedItem] = useState<PackedItem | null>(null);
-
-//   const binDimensions: [number, number, number] = [binWidth, binHeight, binDepth];
-
-//   const addItem = () => {
-//     setItems([...items, { 
-//       id: Date.now().toString(), 
-//       width: 2, 
-//       height: 2, 
-//       depth: 2 
-//     }]);
-//   };
-
-//   const removeItem = (id: string) => {
-//     setItems(items.filter(item => item.id !== id));
-//   };
-
-//   const updateItem = (id: string, field: keyof ItemInput, value: number) => {
-//     setItems(items.map(item => 
-//       item.id === id ? { ...item, [field]: value } : item
-//     ));
-//   };
-
-//   const generatePacking = async () => {
-//     setIsLoading(true);
-//     setError(null);
-//     setFocusedItem(null);
-    
-//     try {
-//       const response = await fetch('http://localhost:8000/pack', {
-//         method: 'POST',
-//         headers: { 'Content-Type': 'application/json' },
-//         body: JSON.stringify({
-//           bin: [binWidth, binHeight, binDepth],
-//           items: items.map(item => [item.width, item.height, item.depth])
-//         })
-//       });
-
-//       if (!response.ok) throw new Error('Packing failed');
-      
-//       const data = await response.json();
-//       setPackedItems(data.packed_items);
-//     } catch (err) {
-//       // Fallback: simulate packing for demo purposes
-//       const simulatedItems: PackedItem[] = [];
-//       let currentX = 0;
-//       let currentY = 0;
-//       let currentZ = 0;
-//       let rowMaxHeight = 0;
-//       let layerMaxDepth = 0;
-
-//       items.forEach((item, index) => {
-//         if (currentX + item.width > binWidth) {
-//           currentX = 0;
-//           currentY += rowMaxHeight;
-//           rowMaxHeight = 0;
-//         }
-        
-//         if (currentY + item.height > binHeight) {
-//           currentY = 0;
-//           currentZ += layerMaxDepth;
-//           layerMaxDepth = 0;
-//           rowMaxHeight = 0;
-//         }
-
-//         if (currentZ + item.depth <= binDepth) {
-//           simulatedItems.push({
-//             name: `Item ${index + 1}`,
-//             position: [currentX, currentY, currentZ],
-//             dimensions: [item.width, item.height, item.depth]
-//           });
-          
-//           currentX += item.width;
-//           rowMaxHeight = Math.max(rowMaxHeight, item.height);
-//           layerMaxDepth = Math.max(layerMaxDepth, item.depth);
-//         }
-//       });
-
-//       if (simulatedItems.length < items.length) {
-//         setError(`Only ${simulatedItems.length} of ${items.length} items could fit`);
-//       }
-      
-//       setPackedItems(simulatedItems);
-//     } finally {
-//       setIsLoading(false);
-//     }
-//   };
-
-//   const reset = () => {
-//     setPackedItems([]);
-//     setError(null);
-//     setFocusedItem(null);
-//   };
-
-//   return (
-//     <div className="min-h-screen bg-background">
-//       <Navbar />
-      
-//       <div className="flex h-screen pt-20">
-//         {/* Control Panel */}
-//         <motion.aside
-//           initial={{ opacity: 0, x: -20 }}
-//           animate={{ opacity: 1, x: 0 }}
-//           transition={{ duration: 0.5, delay: 0.2 }}
-//           className="w-80 p-6 overflow-y-auto"
-//         >
-//           <div className="glass-panel p-6 space-y-6">
-//             <div>
-//               <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-//                 <Package className="w-5 h-5 text-primary" />
-//                 Bin Dimensions
-//               </h2>
-              
-//               <div className="grid grid-cols-3 gap-3">
-//                 <div>
-//                   <Label className="text-xs text-muted-foreground">Width</Label>
-//                   <Input
-//                     type="number"
-//                     value={binWidth}
-//                     onChange={(e) => setBinWidth(Number(e.target.value))}
-//                     className="input-glass mt-1"
-//                     min={1}
-//                   />
-//                 </div>
-//                 <div>
-//                   <Label className="text-xs text-muted-foreground">Height</Label>
-//                   <Input
-//                     type="number"
-//                     value={binHeight}
-//                     onChange={(e) => setBinHeight(Number(e.target.value))}
-//                     className="input-glass mt-1"
-//                     min={1}
-//                   />
-//                 </div>
-//                 <div>
-//                   <Label className="text-xs text-muted-foreground">Depth</Label>
-//                   <Input
-//                     type="number"
-//                     value={binDepth}
-//                     onChange={(e) => setBinDepth(Number(e.target.value))}
-//                     className="input-glass mt-1"
-//                     min={1}
-//                   />
-//                 </div>
-//               </div>
-//             </div>
-
-//             <div className="h-px bg-border" />
-
-//             <div>
-//               <div className="flex items-center justify-between mb-4">
-//                 <h2 className="text-lg font-semibold">Items ({items.length})</h2>
-//                 <Button
-//                   variant="ghost"
-//                   size="sm"
-//                   onClick={addItem}
-//                   className="h-8 px-2"
-//                 >
-//                   <Plus className="w-4 h-4" />
-//                 </Button>
-//               </div>
-
-//               <div className="space-y-3 max-h-60 overflow-y-auto pr-2">
-//                 <AnimatePresence>
-//                   {items.map((item, index) => (
-//                     <motion.div
-//                       key={item.id}
-//                       initial={{ opacity: 0, height: 0 }}
-//                       animate={{ opacity: 1, height: 'auto' }}
-//                       exit={{ opacity: 0, height: 0 }}
-//                       className="flex items-center gap-2 p-3 rounded-lg bg-secondary/30"
-//                     >
-//                       <span 
-//                         className="w-3 h-3 rounded-full flex-shrink-0"
-//                         style={{ backgroundColor: COLORS[index % COLORS.length] }}
-//                       />
-//                       <div className="flex-1 grid grid-cols-3 gap-2">
-//                         <Input
-//                           type="number"
-//                           value={item.width}
-//                           onChange={(e) => updateItem(item.id, 'width', Number(e.target.value))}
-//                           className="input-glass h-8 text-xs"
-//                           min={0.1}
-//                           step={0.1}
-//                         />
-//                         <Input
-//                           type="number"
-//                           value={item.height}
-//                           onChange={(e) => updateItem(item.id, 'height', Number(e.target.value))}
-//                           className="input-glass h-8 text-xs"
-//                           min={0.1}
-//                           step={0.1}
-//                         />
-//                         <Input
-//                           type="number"
-//                           value={item.depth}
-//                           onChange={(e) => updateItem(item.id, 'depth', Number(e.target.value))}
-//                           className="input-glass h-8 text-xs"
-//                           min={0.1}
-//                           step={0.1}
-//                         />
-//                       </div>
-//                       <Button
-//                         variant="ghost"
-//                         size="icon"
-//                         onClick={() => removeItem(item.id)}
-//                         className="h-8 w-8 text-muted-foreground hover:text-destructive"
-//                       >
-//                         <Trash2 className="w-3 h-3" />
-//                       </Button>
-//                     </motion.div>
-//                   ))}
-//                 </AnimatePresence>
-//               </div>
-//             </div>
-
-//             <div className="h-px bg-border" />
-
-//             <div className="space-y-3">
-//               <Button
-//                 variant="hero"
-//                 className="w-full"
-//                 onClick={generatePacking}
-//                 disabled={isLoading || items.length === 0}
-//               >
-//                 {isLoading ? (
-//                   <>
-//                     <Loader2 className="w-4 h-4 animate-spin" />
-//                     Packing...
-//                   </>
-//                 ) : (
-//                   <>
-//                     <Play className="w-4 h-4" />
-//                     Generate Packing
-//                   </>
-//                 )}
-//               </Button>
-              
-//               {packedItems.length > 0 && (
-//                 <Button
-//                   variant="glass"
-//                   className="w-full"
-//                   onClick={reset}
-//                 >
-//                   <RotateCcw className="w-4 h-4" />
-//                   Reset
-//                 </Button>
-//               )}
-//             </div>
-
-//             {error && (
-//               <motion.div
-//                 initial={{ opacity: 0, y: 10 }}
-//                 animate={{ opacity: 1, y: 0 }}
-//                 className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 flex items-start gap-2"
-//               >
-//                 <AlertCircle className="w-4 h-4 text-destructive flex-shrink-0 mt-0.5" />
-//                 <p className="text-sm text-destructive">{error}</p>
-//               </motion.div>
-//             )}
-
-//             {packedItems.length > 0 && (
-//               <motion.div
-//                 initial={{ opacity: 0 }}
-//                 animate={{ opacity: 1 }}
-//                 className="p-4 rounded-lg bg-primary/10 border border-primary/20"
-//               >
-//                 <p className="text-sm font-medium text-primary">
-//                   {packedItems.length} items packed successfully
-//                 </p>
-//                 <p className="text-xs text-muted-foreground mt-1">
-//                   Click on items to focus • Drag to rotate view
-//                 </p>
-//               </motion.div>
-//             )}
-//           </div>
-//         </motion.aside>
-
-//         {/* 3D Canvas */}
-//         <div className="flex-1 relative canvas-container">
-//           <Canvas
-//             dpr={[1, 2]}
-//             gl={{ antialias: true, alpha: true }}
-//             shadows
-//           >
-//             <PerspectiveCamera
-//               makeDefault
-//               position={[binWidth * 1.5, binHeight * 1.2, binDepth * 2]}
-//               fov={50}
-//             />
-//             <Scene
-//               binDimensions={binDimensions}
-//               packedItems={packedItems}
-//               hoveredItem={hoveredItem}
-//               focusedItem={focusedItem}
-//               setHoveredItem={setHoveredItem}
-//               setFocusedItem={setFocusedItem}
-//             />
-//           </Canvas>
-
-//           {/* Empty state */}
-//           {packedItems.length === 0 && !isLoading && (
-//             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-//               <motion.div
-//                 initial={{ opacity: 0 }}
-//                 animate={{ opacity: 1 }}
-//                 transition={{ delay: 0.5 }}
-//                 className="text-center"
-//               >
-//                 <Package className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
-//                 <p className="text-lg text-muted-foreground">
-//                   Configure items and click "Generate Packing"
-//                 </p>
-//               </motion.div>
-//             </div>
-//           )}
-
-//           {/* Loading overlay */}
-//           {isLoading && (
-//             <div className="absolute inset-0 flex items-center justify-center bg-background/50 backdrop-blur-sm">
-//               <motion.div
-//                 initial={{ opacity: 0, scale: 0.9 }}
-//                 animate={{ opacity: 1, scale: 1 }}
-//                 className="glass-panel p-8 text-center"
-//               >
-//                 <Loader2 className="w-10 h-10 text-primary animate-spin mx-auto mb-4" />
-//                 <p className="text-lg font-medium">Computing optimal packing...</p>
-//               </motion.div>
-//             </div>
-//           )}
-//         </div>
-//       </div>
-//     </div>
-//   );
-// }
-
-
-
-
-import { useState, useRef } from 'react';
-import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { useState, useRef, useCallback, useEffect } from 'react';
+import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, Html, Line, PerspectiveCamera } from '@react-three/drei';
 import * as THREE from 'three';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -595,13 +7,21 @@ import { Navbar } from '@/components/Navbar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, Plus, Trash2, Play, RotateCcw, Package, AlertCircle } from 'lucide-react';
-import { useMouse } from '@/hooks/useMouse';
+import {
+  Loader2, Plus, Trash2, Play, Pause, Package, Upload, FileUp,
+  SkipBack, SkipForward, ChevronLeft, ChevronRight, Scale, ShieldAlert, ShieldCheck
+} from 'lucide-react';
+import { toast } from 'sonner';
+import Papa from 'papaparse';
+import { cn } from '@/lib/utils'; // Assuming you have a utility for class names, otherwise use template literals
 
+// --- TYPES ---
 interface PackedItem {
   name: string;
   position: [number, number, number];
   dimensions: [number, number, number];
+  weight?: number;   // New field coming back from API (optional)
+  fragile?: boolean; // New field coming back from API (optional)
 }
 
 interface ItemInput {
@@ -609,6 +29,8 @@ interface ItemInput {
   width: number;
   height: number;
   depth: number;
+  weight: number;    // NEW
+  fragile: boolean;  // NEW
 }
 
 const COLORS = [
@@ -616,8 +38,8 @@ const COLORS = [
   '#06b6d4', '#a855f7', '#22c55e', '#eab308', '#f43f5e'
 ];
 
-/* -------------------- 3D BOX -------------------- */
-function PackedBox({ position, dimensions, name, color, hovered, onHover, onClick }: any) {
+/* -------------------- 3D BOX COMPONENT -------------------- */
+function PackedBox({ position, dimensions, name, color, hovered, onHover, onClick, weight, fragile }: any) {
   const mesh = useRef<THREE.Mesh>(null);
   const [w, h, d] = dimensions;
   const [x, y, z] = position;
@@ -632,25 +54,49 @@ function PackedBox({ position, dimensions, name, color, hovered, onHover, onClic
     <group position={[x + w / 2, y + h / 2, z + d / 2]}>
       <mesh
         ref={mesh}
-        onPointerOver={() => onHover(true)}
-        onPointerOut={() => onHover(false)}
-        onClick={onClick}
+        onPointerOver={(e) => { e.stopPropagation(); onHover(true); }}
+        onPointerOut={() => { onHover(false); }}
+        onClick={(e) => { e.stopPropagation(); onClick(); }}
       >
         <boxGeometry args={[w, h, d]} />
-        <meshStandardMaterial color={color} transparent opacity={0.75} />
+        {/* Fragile items get a slight red tint if desired, otherwise standard color */}
+        <meshStandardMaterial
+            color={fragile ? '#ff6b6b' : color}
+            transparent
+            opacity={0.85}
+            emissive={fragile ? '#ff0000' : '#000000'}
+            emissiveIntensity={fragile ? 0.2 : 0}
+        />
       </mesh>
 
       <lineSegments>
         <edgesGeometry args={[new THREE.BoxGeometry(w, h, d)]} />
-        <lineBasicMaterial color={hovered ? '#ffffff' : color} />
+        <lineBasicMaterial color={hovered ? '#ffffff' : 'rgba(0,0,0,0.3)'} />
       </lineSegments>
 
+      {/* TOOLTIP */}
       {hovered && (
-        <Html distanceFactor={10}>
-          <div className="glass-panel px-3 py-2 text-xs">
-            <b>{name}</b>
-            <div>{w} × {h} × {d}</div>
-            <div>({x}, {y}, {z})</div>
+        <Html distanceFactor={10} zIndexRange={[100, 0]}>
+          <div className="glass-panel px-3 py-2 text-xs pointer-events-none whitespace-nowrap z-50 shadow-xl border border-white/20 bg-black/80 text-white rounded-md">
+            <div className="flex items-center gap-2 mb-1 border-b border-white/10 pb-1">
+                <b className="text-primary">{name}</b>
+                {fragile && <ShieldAlert className="w-3 h-3 text-red-500 animate-pulse" />}
+            </div>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-[10px] opacity-90">
+                <span>Dim:</span> <span>{w} × {h} × {d}</span>
+                <span>Pos:</span> <span>[{x}, {y}, {z}]</span>
+                {weight > 0 && (
+                    <>
+                        <span>Wt:</span>
+                        <span className="font-mono text-yellow-400">{weight}kg</span>
+                    </>
+                )}
+                {fragile && (
+                    <span className="col-span-2 text-red-400 font-bold text-center mt-1 uppercase tracking-wider">
+                        FRAGILE
+                    </span>
+                )}
+            </div>
           </div>
         </Html>
       )}
@@ -658,196 +104,362 @@ function PackedBox({ position, dimensions, name, color, hovered, onHover, onClic
   );
 }
 
-/* -------------------- BIN -------------------- */
+/* -------------------- BIN WIREFRAME -------------------- */
 function BinWireframe({ dims }: { dims: [number, number, number] }) {
   const [w, h, d] = dims;
   const edges: [number, number, number][] = [
-  [0, 0, 0], [w, 0, 0],
-  [w, 0, 0], [w, 0, d],
-  [w, 0, d], [0, 0, d],
-  [0, 0, d], [0, 0, 0],
-
-  [0, h, 0], [w, h, 0],
-  [w, h, 0], [w, h, d],
-  [w, h, d], [0, h, d],
-  [0, h, d], [0, h, 0],
-
-  [0, 0, 0], [0, h, 0],
-  [w, 0, 0], [w, h, 0],
-  [w, 0, d], [w, h, d],
-  [0, 0, d], [0, h, d],
-];
-
+    [0, 0, 0], [w, 0, 0], [w, 0, 0], [w, 0, d], [w, 0, d], [0, 0, d], [0, 0, d], [0, 0, 0],
+    [0, h, 0], [w, h, 0], [w, h, 0], [w, h, d], [w, h, d], [0, h, d], [0, h, d], [0, h, 0],
+    [0, 0, 0], [0, h, 0], [w, 0, 0], [w, h, 0], [w, 0, d], [w, h, d], [0, 0, d], [0, h, d],
+  ];
 
   return (
     <>
       <mesh position={[w/2, h/2, d/2]}>
         <boxGeometry args={[w,h,d]} />
-        <meshStandardMaterial transparent opacity={0.05} />
+        <meshStandardMaterial transparent opacity={0.03} color="#000" depthWrite={false} side={THREE.DoubleSide} />
       </mesh>
-
       {Array.from({ length: 12 }).map((_, i) => (
-        <Line key={i} points={[edges[i*2], edges[i*2+1]]} color="#00d4ff" />
+        <Line key={i} points={[edges[i*2], edges[i*2+1]]} color="#00d4ff" lineWidth={1.5} opacity={0.4} transparent />
       ))}
     </>
   );
 }
 
-/* -------------------- MAIN -------------------- */
+/* -------------------- MAIN WORKSPACE -------------------- */
 export default function Workspace() {
   const [binWidth, setBinWidth] = useState(10);
   const [binHeight, setBinHeight] = useState(10);
   const [binDepth, setBinDepth] = useState(10);
 
+  // Initial state with weight and fragile props
   const [items, setItems] = useState<ItemInput[]>([
-    { id: '1', width: 3, height: 4, depth: 2 },
-    { id: '2', width: 2, height: 2, depth: 2 },
+    { id: '1', width: 3, height: 4, depth: 2, weight: 1.5, fragile: false },
+    { id: '2', width: 2, height: 2, depth: 2, weight: 0.5, fragile: true },
   ]);
 
   const [packedItems, setPackedItems] = useState<PackedItem[]>([]);
   const [hovered, setHovered] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+
+  // Replay State
+  const [currentStep, setCurrentStep] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // --- AUTO-PLAY EFFECT ---
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isPlaying) {
+      interval = setInterval(() => {
+        setCurrentStep((prev) => {
+          if (prev < packedItems.length) return prev + 1;
+          else { setIsPlaying(false); return prev; }
+        });
+      }, 600);
+    }
+    return () => clearInterval(interval);
+  }, [isPlaying, packedItems.length]);
 
   const addItem = () =>
-    setItems([...items, { id: Date.now().toString(), width: 2, height: 2, depth: 2 }]);
+    setItems([...items, { id: Date.now().toString(), width: 2, height: 2, depth: 2, weight: 0, fragile: false }]);
 
-  const updateItem = (id: string, key: keyof ItemInput, val: number) =>
+  // Generic updater for numbers/booleans
+  const updateItem = (id: string, key: keyof ItemInput, val: any) =>
     setItems(items.map(i => i.id === id ? { ...i, [key]: val } : i));
+
+  // --- CSV PARSER (UPDATED) ---
+  const handleCSV = (file: File) => {
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      dynamicTyping: true,
+      transformHeader: (header) => header.toLowerCase().replace(/[^a-z0-9]/g, "").trim(),
+      complete: (results: any) => {
+        const newItems: ItemInput[] = [];
+
+        results.data.forEach((row: any) => {
+          const h = row.height || row.h || 0;
+          let w = row.width || row.w || 0;
+          let d = row.depth || row.d || row.deep || 0;
+          const weight = row.weight || row.wt || row.mass || row.kg || 0;
+
+          // Flexible Fragility Parsing
+          let fragile = row.fragile || row.fragility || false;
+          if (typeof fragile === 'string') {
+              const lower = fragile.toLowerCase();
+              fragile = (lower === 'yes' || lower === 'true' || lower === 'y' || lower === '1');
+          } else {
+              fragile = Boolean(fragile);
+          }
+
+          if (!d && (row.length || row.l || row.len)) d = row.length || row.l || row.len;
+          if (!w && d && (row.length || row.l)) w = row.length || row.l;
+
+          if (Number(w) > 0 && Number(h) > 0 && Number(d) > 0) {
+            newItems.push({
+              id: Math.random().toString(36).substr(2, 9),
+              width: Number(w),
+              height: Number(h),
+              depth: Number(d),
+              weight: Number(weight),
+              fragile: fragile
+            });
+          }
+        });
+
+        if (newItems.length > 0) {
+          setItems(prev => [...prev, ...newItems]);
+          toast.success(`Imported ${newItems.length} items`);
+        } else {
+          toast.error("No valid items found.");
+        }
+      },
+      error: () => toast.error("Failed to parse CSV file")
+    });
+  };
+
+  const onDragOver = useCallback((e: React.DragEvent) => { e.preventDefault(); setIsDragging(true); }, []);
+  const onDragLeave = useCallback((e: React.DragEvent) => { e.preventDefault(); setIsDragging(false); }, []);
+  const onDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault(); setIsDragging(false);
+    const file = e.dataTransfer.files[0];
+    if (file && (file.type === "text/csv" || file.name.endsWith('.csv'))) handleCSV(file);
+    else toast.error("Please drop a valid CSV file");
+  }, []);
 
   const generatePacking = async () => {
     setLoading(true);
+    setIsPlaying(false);
     try {
+      // Sending [w, h, d, weight, is_fragile(1/0)]
       const res = await fetch('http://localhost:8000/pack', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           bin: [binWidth, binHeight, binDepth],
-          items: items.map(i => [i.width, i.height, i.depth])
+          items: items.map(i => [
+              i.width,
+              i.height,
+              i.depth,
+              i.weight,
+              i.fragile ? 1 : 0
+          ])
         })
       });
+
+      if (!res.ok) throw new Error("Server Error");
+
       const data = await res.json();
-      setPackedItems(data.packed_items);
-    } catch {
+      // Ensure backend returns data mapped correctly or map it here if needed
+      // Assuming backend returns a list of objects that might match PackedItem interface
+      // We merge original metadata (weight/fragile) back if the backend doesn't return it
+      const enhancedItems = data.packed_items.map((pItem: any, idx: number) => ({
+          ...pItem,
+          // Fallback: If backend doesn't return weight/fragile, we might lose track of which item is which
+          // Ideally backend returns ID. For now, we trust the visual.
+          weight: pItem.weight ?? 0,
+          fragile: pItem.fragile ?? false
+      }));
+
+      setPackedItems(enhancedItems);
+      setCurrentStep(enhancedItems.length);
+      toast.success("Packing generated!");
+    } catch (e) {
+      console.error(e);
       setPackedItems([]);
+      setCurrentStep(0);
+      toast.error("Failed to connect to packing server");
     }
     setLoading(false);
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex flex-col">
       <Navbar />
 
-      <div className="flex pt-20 h-screen">
+      <div className="flex-1 flex pt-16 h-screen overflow-hidden">
         {/* -------- LEFT PANEL -------- */}
-        <aside className="w-80 p-6 space-y-6">
-          <div className="glass-panel p-6 space-y-6">
+        <aside className="w-80 p-4 flex flex-col h-full border-r border-border/50 bg-background/50 backdrop-blur-sm z-10">
+          <div className="glass-panel p-4 flex flex-col h-full gap-4">
 
-            <div>
-              <h2 className="font-semibold mb-3 flex gap-2">
-                <Package className="w-5 h-5" /> Bin Dimensions
+            {/* Bin Settings */}
+            <div className="flex-shrink-0">
+              <h2 className="font-semibold mb-3 flex items-center gap-2 text-sm">
+                <Package className="w-4 h-4 text-primary" /> Bin Dimensions
               </h2>
-
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-3 gap-2">
                 {[
                   ['Width', binWidth, setBinWidth],
                   ['Height', binHeight, setBinHeight],
                   ['Depth', binDepth, setBinDepth],
                 ].map(([label, value, setter]: any) => (
                   <div key={label}>
-                    <Label className="text-xs">{label}</Label>
+                    <Label className="text-[10px] uppercase text-muted-foreground">{label}</Label>
                     <Input
                       type="number"
                       value={value === 0 ? '' : value}
-                      onChange={(e) =>
-                        setter(e.target.value === '' ? 0 : Number(e.target.value))
-                      }
+                      onChange={(e) => setter(e.target.value === '' ? 0 : Number(e.target.value))}
                       min={1}
-                      className="input-glass mt-1"
+                      className="h-8 text-sm mt-0.5"
                     />
                   </div>
                 ))}
               </div>
             </div>
 
-            <div className="h-px bg-border" />
+            <div className="h-px bg-border/50 flex-shrink-0" />
 
-            <div>
-              <div className="flex justify-between mb-3">
-                <h2 className="font-semibold">Items ({items.length})</h2>
-                <Button size="sm" variant="ghost" onClick={addItem}>
-                  <Plus className="w-4 h-4" />
-                </Button>
+            {/* Items List */}
+            <div className="flex-1 flex flex-col min-h-0">
+              <div className="flex justify-between items-center mb-2 flex-shrink-0">
+                <h2 className="font-semibold text-sm">Items ({items.length})</h2>
+                <div className="flex gap-1">
+                  <input type="file" ref={fileInputRef} onChange={(e) => e.target.files?.[0] && handleCSV(e.target.files[0])} accept=".csv" className="hidden" />
+                  <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => fileInputRef.current?.click()}>
+                    <Upload className="w-4 h-4" />
+                  </Button>
+                  <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={addItem}>
+                    <Plus className="w-4 h-4" />
+                  </Button>
+                </div>
               </div>
 
-              <div className="space-y-3 max-h-64 overflow-y-auto">
-                <AnimatePresence>
-                  {items.map((item, i) => (
-                    <motion.div
-                      key={item.id}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      className="flex items-center gap-2"
-                    >
-                      <span
-                        className="w-3 h-3 rounded-full"
-                        style={{ background: COLORS[i % COLORS.length] }}
-                      />
-                      {(['width','height','depth'] as const).map(k => (
-                        <Input
-                          key={k}
-                          type="number"
-                          value={item[k] === 0 ? '' : item[k]}
-                          onChange={(e) =>
-                            updateItem(item.id, k, e.target.value === '' ? 0 : Number(e.target.value))
-                          }
-                          className="input-glass h-8 text-xs"
-                          min={0.1}
-                          step={0.1}
-                        />
-                      ))}
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => setItems(items.filter(x => x.id !== item.id))}
+              <div
+                className={`flex-1 overflow-y-auto rounded-md transition-all duration-200 border-2 ${isDragging ? "border-primary bg-primary/5 border-dashed" : "border-transparent"}`}
+                onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop}
+              >
+                {items.length === 0 && (
+                  <div className="h-full flex flex-col items-center justify-center text-muted-foreground p-4 text-center select-none">
+                    <FileUp className="w-8 h-8 mb-3 opacity-30" />
+                    <p className="text-xs">Drag & Drop CSV here</p>
+                  </div>
+                )}
+
+                <div className="space-y-3 p-1">
+                  <AnimatePresence>
+                    {items.map((item, i) => (
+                      <motion.div
+                        key={item.id}
+                        initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, height: 0 }}
+                        className="flex flex-col gap-2 p-2 rounded border border-border/50 bg-background/50 hover:bg-muted/50 transition-colors group relative"
                       >
-                        <Trash2 className="w-3 h-3" />
-                      </Button>
-                    </motion.div>
-                  ))}
-                </AnimatePresence>
+                        {/* Remove Button (Absolute top-right) */}
+                        <Button
+                            size="icon" variant="ghost"
+                            className="absolute -right-2 -top-2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity z-10 text-muted-foreground hover:text-destructive"
+                            onClick={() => setItems(items.filter(x => x.id !== item.id))}
+                        >
+                            <Trash2 className="w-3 h-3" />
+                        </Button>
+
+                        {/* Top Row: Color + Dimensions */}
+                        <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: COLORS[i % COLORS.length] }} />
+                            <div className="grid grid-cols-3 gap-1 flex-1">
+                            {(['width','height','depth'] as const).map(k => (
+                                <Input
+                                key={k} type="number" placeholder={k[0].toUpperCase()}
+                                value={item[k] || ''} onChange={(e) => updateItem(item.id, k, Number(e.target.value))}
+                                className="h-7 text-xs px-1 text-center" min={0.1}
+                                />
+                            ))}
+                            </div>
+                        </div>
+
+                        {/* Bottom Row: Weight + Fragility */}
+                        <div className="flex items-center gap-2 pl-4">
+                            <div className="relative flex-1">
+                                <Scale className="absolute left-1.5 top-2 w-3 h-3 text-muted-foreground" />
+                                <Input
+                                    type="number" placeholder="Wt"
+                                    value={item.weight || ''}
+                                    onChange={(e) => updateItem(item.id, 'weight', Number(e.target.value))}
+                                    className="h-7 text-xs pl-6 pr-6 text-center"
+                                />
+                                <span className="absolute right-2 top-2 text-[8px] text-muted-foreground">kg</span>
+                            </div>
+
+                            <Button
+                                variant={item.fragile ? "destructive" : "outline"}
+                                size="sm"
+                                className={`h-7 px-2 text-[10px] gap-1 transition-all ${!item.fragile && "text-muted-foreground hover:text-foreground"}`}
+                                onClick={() => updateItem(item.id, 'fragile', !item.fragile)}
+                            >
+                                {item.fragile ? <ShieldAlert className="w-3 h-3" /> : <ShieldCheck className="w-3 h-3 opacity-50" />}
+                                {item.fragile ? "Fragile" : "Safe"}
+                            </Button>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
+                </div>
               </div>
             </div>
 
-            <Button
-              variant="hero"
-              className="w-full"
-              onClick={generatePacking}
-              disabled={loading}
-            >
-              {loading ? <Loader2 className="animate-spin" /> : <Play />}
+            <Button variant="default" className="w-full flex-shrink-0 shadow-lg shadow-primary/20" onClick={generatePacking} disabled={loading}>
+              {loading ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : <Play className="mr-2 h-4 w-4 fill-current" />}
               Generate Packing
             </Button>
           </div>
         </aside>
 
         {/* -------- 3D VIEW -------- */}
-        <div className="flex-1">
+        <div className="flex-1 relative bg-gradient-to-b from-background to-muted/20 overflow-hidden">
           <Canvas>
-            <PerspectiveCamera makeDefault position={[20, 20, 30]} />
-            <ambientLight intensity={0.5} />
-            <OrbitControls />
-            <BinWireframe dims={[binWidth, binHeight, binDepth]} />
-            {packedItems.map((item, i) => (
-              <PackedBox
-                key={item.name}
-                {...item}
-                color={COLORS[i % COLORS.length]}
-                hovered={hovered === item.name}
-                onHover={(v: boolean) => setHovered(v ? item.name : null)}
-              />
-            ))}
+            <PerspectiveCamera makeDefault position={[25, 25, 35]} fov={50} />
+            <ambientLight intensity={0.6} />
+            <pointLight position={[10, 20, 10]} intensity={0.8} />
+            <pointLight position={[-10, 10, -10]} intensity={0.5} />
+            <OrbitControls makeDefault minDistance={10} maxDistance={100} />
+
+            <group position={[-binWidth/2, -binHeight/2, -binDepth/2]}>
+              <BinWireframe dims={[binWidth, binHeight, binDepth]} />
+
+              {packedItems.slice(0, currentStep).map((item, i) => (
+                <PackedBox
+                  key={i}
+                  {...item}
+                  color={COLORS[i % COLORS.length]}
+                  hovered={hovered === item.name}
+                  onHover={(v: boolean) => setHovered(v ? item.name : null)}
+                />
+              ))}
+            </group>
+
+            <gridHelper args={[100, 100, 0x222222, 0x111111]} position={[0, -binHeight/2 - 0.1, 0]} />
           </Canvas>
+
+          {/* --- REPLAY CONTROLS --- */}
+          {packedItems.length > 0 && (
+            <div className="absolute bottom-8 left-1/2 -translate-x-1/2 w-[90%] max-w-lg">
+              <div className="glass-panel p-3 flex flex-col gap-2 animate-in slide-in-from-bottom-5">
+                <div className="flex items-center gap-3 px-1">
+                  <span className="text-[10px] font-mono text-muted-foreground w-8 text-right">0</span>
+                  <input
+                    type="range" min={0} max={packedItems.length} value={currentStep}
+                    onChange={(e) => { setCurrentStep(Number(e.target.value)); setIsPlaying(false); }}
+                    className="flex-1 h-1.5 bg-muted rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary"
+                  />
+                  <span className="text-[10px] font-mono text-muted-foreground w-8">{packedItems.length}</span>
+                </div>
+                <div className="flex items-center justify-center gap-2">
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setCurrentStep(0); setIsPlaying(false); }}><SkipBack className="w-4 h-4" /></Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setCurrentStep(p => Math.max(0, p - 1)); setIsPlaying(false); }}><ChevronLeft className="w-4 h-4" /></Button>
+                  <Button variant={isPlaying ? "secondary" : "default"} size="icon" className="h-10 w-10 rounded-full shadow-md" onClick={() => { if (currentStep === packedItems.length) setCurrentStep(0); setIsPlaying(!isPlaying); }}>
+                    {isPlaying ? <Pause className="w-4 h-4 fill-current" /> : <Play className="w-4 h-4 fill-current ml-0.5" />}
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setCurrentStep(p => Math.min(packedItems.length, p + 1)); setIsPlaying(false); }}><ChevronRight className="w-4 h-4" /></Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setCurrentStep(packedItems.length); setIsPlaying(false); }}><SkipForward className="w-4 h-4" /></Button>
+                </div>
+                <div className="text-center text-[10px] text-muted-foreground">
+                  {currentStep === 0 ? "Ready to pack" : currentStep === packedItems.length ? "Packing Complete" : `Packing item ${currentStep} of ${packedItems.length}`}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
